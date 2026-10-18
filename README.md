@@ -5,6 +5,7 @@ Alexander Sánchez · Ingeniería en Computación · Universidad Nacional de Loj
 ## Actividades práctico-experimentales (APE)
 - [APE 1 – Arquitecturas de sistemas distribuidos](APE1_Alexander_Sanchez)
 - [APE 2 – Cliente-servidor con archivos](APE2_Alexander_Sanchez)
+- [APE 3 – Sincronización de Procesos: Exclusión Mutua, Semáforos y Problemas Clásicos de Concurrencia](APE3_Alexander_Sanchez)
 
 ....
 
