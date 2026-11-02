@@ -3,8 +3,5 @@ __pycache__/
 .vscode/
 .DS_Store
 .venv/
-__pycache__/
 **/mosquitto/data/*
 **/mosquitto/log/*
-.venv/
-__pycache__/
