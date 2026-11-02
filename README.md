@@ -7,5 +7,5 @@ Alexander Sánchez · Ingeniería en Computación · Universidad Nacional de Loj
 - [APE 2 – Cliente-servidor con archivos](APE2_Alexander_Sanchez)
 - [APE 3 – Sincronización de Procesos: Exclusión Mutua, Semáforos y Problemas Clásicos de Concurrencia](APE3_Alexander_Sanchez)
 
-....
+- [APE 5 – De los sensores a las colas: MQTT + SQLite + RabbitMQ](APE5_Alexander_Sanchez)
 
