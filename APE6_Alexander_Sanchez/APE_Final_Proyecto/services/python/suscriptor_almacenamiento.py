@@ -1,10 +1,11 @@
 import json
+import os
 import sqlite3
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
 # CONFIGURACIÓN MQTT
-BROKER = "localhost"
+BROKER = os.getenv("MQTT_BROKER", "localhost")
 PORT = 1883
 DB_NAME = "telemetria.db"
 

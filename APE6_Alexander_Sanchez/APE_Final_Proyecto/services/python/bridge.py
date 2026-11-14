@@ -2,14 +2,28 @@ import json
 import pika
 import paho.mqtt.client as mqtt
 import os
+import time
 
 # CONFIGURACIÓN (Usa variables de entorno, por defecto localhost)
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = 1883
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
+RABBITMQ_USER = os.getenv("RABBITMQ_USER", "admin")
+RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "admin123")
 
 def configurar_rabbitmq():
-    conexion = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+    credenciales = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+    parametros = pika.ConnectionParameters(host=RABBITMQ_HOST, credentials=credenciales)
+    # RabbitMQ tarda unos segundos en arrancar: se reintenta antes de fallar
+    for intento in range(1, 31):
+        try:
+            conexion = pika.BlockingConnection(parametros)
+            break
+        except pika.exceptions.AMQPConnectionError:
+            print(f"RabbitMQ no disponible en {RABBITMQ_HOST}, reintento {intento}/30...")
+            time.sleep(3)
+    else:
+        raise SystemExit("No se pudo conectar a RabbitMQ")
     canal = conexion.channel()
     canal.queue_declare(queue="cola.gps.telemetria", durable=True)
     canal.queue_declare(queue="cola.alertas.temperatura", durable=True)

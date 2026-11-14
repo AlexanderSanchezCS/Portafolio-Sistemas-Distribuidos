@@ -1,11 +1,12 @@
 import json
+import os
 import time
 import random
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
 # CONFIGURACIÓN MQTT
-BROKER = "localhost"
+BROKER = os.getenv("MQTT_BROKER", "localhost")
 PORT = 1883
 VEHICULOS = ["VH-001", "VH-002", "VH-003"]
 

@@ -21,17 +21,17 @@
 
 ##  Contenido
 
-- [Descripción](#-descripción)
-- [Arquitectura](#-arquitectura)
-- [Tecnologías](#-tecnologías)
-- [Estructura del proyecto](#-estructura-del-proyecto)
-- [Servicios y puertos](#-servicios-y-puertos)
-- [Mensajería en RabbitMQ](#-mensajería-en-rabbitmq)
-- [Ejecución](#-ejecución)
-- [Verificación](#-verificación)
-- [API REST](#-api-rest)
-- [Persistencia](#-persistencia)
-- [Evolución desde la APE 5](#-evolución-desde-la-ape-5)
+- [Descripción](#descripción)
+- [Arquitectura](#arquitectura)
+- [Tecnologías](#tecnologías)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Servicios y puertos](#servicios-y-puertos)
+- [Mensajería en RabbitMQ](#mensajería-en-rabbitmq)
+- [Ejecución](#ejecución)
+- [Verificación](#verificación)
+- [API REST](#api-rest)
+- [Persistencia](#persistencia)
+- [Evolución desde la APE 5](#evolución-desde-la-ape-5)
 
 ---
 
@@ -76,10 +76,12 @@ flowchart LR
     SIM -- "MQTT QoS 1<br/>flota/{id}/..." --> MQ
     MQ --> SUB
     MQ --> BRG
-    BRG -- AMQP --> EX
-    EX -- gps.routing --> Q1
-    EX -- temp.alert --> Q2
-    EX -- fuel.routing --> Q3
+    BRG -- "AMQP · GPS" --> Q1
+    BRG -- "temp > 4 °C" --> Q2
+    BRG -- "fuel < 20 %" --> Q3
+    EX -. gps.routing .-> Q1
+    EX -. temp.alert .-> Q2
+    EX -. fuel.routing .-> Q3
     Q1 --> GC --> DB --> API
     Q2 --> AC
     Q3 --> AC
@@ -90,7 +92,7 @@ flowchart LR
 
 1. El simulador publica una lectura en el tópico `flota/{id}/{sensor}`.
 2. Mosquitto la entrega al suscriptor (que la guarda en SQLite) y al puente.
-3. El puente la publica en `exchange.fleet` con la routing key que corresponde.
+3. El puente la publica directamente en la cola de RabbitMQ que corresponde según el sensor y su umbral.
 4. Spring Boot la consume: el GPS se guarda en H2 y las alertas se reenvían a `cola.notificaciones`.
 5. La API REST consulta H2 y devuelve el estado de la flota.
 
@@ -113,8 +115,8 @@ flowchart LR
 ##  Estructura del proyecto
 
 ```text
-APE6_Alexander_Sanchez/
-├── docker-compose.yml                  # Pila completa (red host)
+APE6_Alexander_Sanchez/APE_Final_Proyecto/
+├── docker-compose.yml                  # Pila completa (red flota_net)
 ├── infra/
 │   ├── docker-compose.yml              # Solo Mosquitto + RabbitMQ
 │   └── mosquitto/config/mosquitto.conf # Listener 1883 y persistencia
@@ -122,7 +124,7 @@ APE6_Alexander_Sanchez/
     ├── python/
     │   ├── simulador_sensores.py       # 3 vehículos × 3 sensores, QoS 1
     │   ├── suscriptor_almacenamiento.py# SQLite + detección de alertas
-    │   ├── bridge.py                   # MQTT → RabbitMQ (4 colas)
+    │   ├── bridge.py                   # MQTT → RabbitMQ (4 colas), usado por Docker
     │   ├── requirements.txt
     │   ├── Dockerfile.simulador
     │   └── Dockerfile.bridge
@@ -157,9 +159,9 @@ APE6_Alexander_Sanchez/
 
 ##  Mensajería en RabbitMQ
 
-Exchange **`exchange.fleet`** de tipo **direct**:
+El puente publica cada lectura directamente en su cola. Además, Spring Boot declara el exchange **`exchange.fleet`** (direct) con sus *bindings*, de modo que otros productores también pueden enrutar por *routing key*.
 
-| Cola | Routing key | Publica | Consume | Condición |
+| Cola | Routing key en `exchange.fleet` | Publica | Consume | Condición |
 |:--|:--|:--|:--|:--|
 | `cola.gps.telemetria` | `gps.routing` | Puente | `GpsConsumer` → H2 | Toda lectura GPS |
 | `cola.alertas.temperatura` | `temp.alert` | Puente | `AlertConsumer` | Temperatura > 4 °C |
@@ -172,15 +174,33 @@ Exchange **`exchange.fleet`** de tipo **direct**:
 
 ### Requisitos
 
-- Docker y Docker Compose
-- Linux (la pila usa `network_mode: host`)
+- Docker y Docker Compose (Linux, Windows o macOS)
+- Puertos libres: `1883`, `5672`, `8080`, `9001`, `15672`
 
 ### Levantar toda la pila
 
+Todos los comandos se ejecutan dentro de la carpeta del proyecto:
+
 ```bash
+git clone https://github.com/AlexanderSanchezCS/Portafolio-Sistemas-Distribuidos.git
+cd Portafolio-Sistemas-Distribuidos/APE6_Alexander_Sanchez/APE_Final_Proyecto
 docker compose up --build -d
 docker compose ps
 ```
+
+La primera vez tarda unos minutos porque Maven descarga dependencias. Los contenedores se comunican por la red interna `flota_net` usando el nombre de cada servicio (`mosquitto`, `rabbitmq`), así que no hace falta configurar ninguna IP.
+
+### Suscriptor SQLite (opcional)
+
+El suscriptor no forma parte del `docker-compose`. Con la pila arriba, se ejecuta desde el equipo anfitrión:
+
+```bash
+cd services/python
+pip install -r requirements.txt
+python suscriptor_almacenamiento.py
+```
+
+Crea `telemetria.db` en esa carpeta y muestra las alertas en consola.
 
 ### Ver los logs
 
@@ -206,6 +226,7 @@ docker compose down
 <br>
 
 ```bash
+# Desde APE_Final_Proyecto/
 # 1. Solo infraestructura
 cd infra && docker compose up -d
 
@@ -246,14 +267,14 @@ docker exec rabbitmq_broker rabbitmqctl list_queues name messages consumers
 | Método | Endpoint | Descripción |
 |:--:|:--|:--|
 | `GET` | `/api/fleet/status` | Resumen de la flota |
-| `GET` | `/api/fleet/vehicle/{id}/telemetria` | Historial GPS de un vehículo |
+| `GET` | `/api/fleet/vehicle/{id}/telemetria` | Últimos 10 registros GPS de un vehículo |
 
 ```bash
 curl http://localhost:8080/api/fleet/status
 ```
 
 ```json
-{ "totalVehicles": 3, "activeAlerts": 0, "timestamp": "2026-11-10T..." }
+{ "totalVehicles": 3, "totalGpsRecords": 27, "timestamp": "2026-11-10T..." }
 ```
 
 ```bash
@@ -284,10 +305,10 @@ curl http://localhost:8080/api/fleet/vehicle/VH-001/telemetria
 | Alcance | Solo capa IoT | IoT + microservicio Spring Boot |
 | Colas | 3 | 4 (se agrega `cola.notificaciones`) |
 | Consumo de RabbitMQ | ✗ | ✓ `GpsConsumer` y `AlertConsumer` |
-| Enrutamiento | Colas directas | `exchange.fleet` con bindings |
+| Enrutamiento | Colas directas | Colas directas + `exchange.fleet` declarado |
 | API REST | ✗ | ✓ `/api/fleet/*` |
 | Base de datos | SQLite | SQLite + H2 con JPA |
-| Red Docker | Bridge con puertos | Host |
+| Red Docker | Puertos mapeados | Red interna `flota_net` |
 
 ---
 
