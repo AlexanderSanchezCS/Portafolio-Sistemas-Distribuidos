@@ -76,12 +76,12 @@ flowchart LR
     SIM -- "MQTT QoS 1<br/>flota/{id}/..." --> MQ
     MQ --> SUB
     MQ --> BRG
-    BRG -- "AMQP · GPS" --> Q1
-    BRG -- "temp > 4 °C" --> Q2
-    BRG -- "fuel < 20 %" --> Q3
-    EX -. gps.routing .-> Q1
-    EX -. temp.alert .-> Q2
-    EX -. fuel.routing .-> Q3
+    BRG -->|"AMQP · GPS"| Q1
+    BRG -->|"temp > 4 °C"| Q2
+    BRG -->|"fuel < 20 %"| Q3
+    EX -.->|gps.routing| Q1
+    EX -.->|temp.alert| Q2
+    EX -.->|fuel.routing| Q3
     Q1 --> GC --> DB --> API
     Q2 --> AC
     Q3 --> AC
