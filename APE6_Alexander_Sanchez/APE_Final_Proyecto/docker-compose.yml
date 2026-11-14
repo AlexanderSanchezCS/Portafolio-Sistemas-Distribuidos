@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mosquitto_broker
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./infra/mosquitto/config:/mosquitto/config
+      - ./infra/mosquitto/data:/mosquitto/data
+    networks:
+      - flota_net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_broker
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    networks:
+      - flota_net
+
+  fleet-monitor:
+    build:
+      context: ./services/spring-boot/fleet-monitor
+      dockerfile: Dockerfile
+    container_name: fleet_monitor
+    ports:
+      - "8080:8080"
+    environment:
+      - RABBITMQ_HOST=192.168.10.146
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=admin
+      - RABBITMQ_PASSWORD=admin123
+    depends_on:
+      - rabbitmq
+    networks:
+      - flota_net
+
+  bridge:
+    build:
+      context: ./services/python
+      dockerfile: Dockerfile.bridge
+    container_name: mqtt_rabbitmq_bridge
+    environment:
+      - MQTT_BROKER=${MQTT_BROKER:-mosquitto}
+      - RABBITMQ_HOST=192.168.10.146
+    depends_on:
+      - mosquitto
+      - rabbitmq
+    networks:
+      - flota_net
+
+  simulador:
+    build:
+      context: ./services/python
+      dockerfile: Dockerfile.simulador
+    container_name: simulador_sensores
+    environment:
+      - MQTT_BROKER=${MQTT_BROKER:-mosquitto}
+    depends_on:
+      - mosquitto
+    networks:
+      - flota_net
+
+networks:
+  flota_net:
+    driver: bridge
