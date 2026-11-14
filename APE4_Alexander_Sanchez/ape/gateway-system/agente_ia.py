@@ -1,10 +1,12 @@
+import os
 import requests
 import json
 
-# URL y clave según la configuración del servidor
-URL_COMPLETA = "url"
-API_KEY = "api key"
-MODELO = "qwen3-coder:30b"
+# Configuración del servidor de IA (Open WebUI / Ollama de la carrera).
+# Se leen de variables de entorno para no dejar credenciales en el código.
+URL_COMPLETA = os.getenv("IA_URL", "")
+API_KEY = os.getenv("IA_API_KEY", "")
+MODELO = os.getenv("IA_MODELO", "qwen3-coder:30b")
 
 def decidir_worker(pedido, estado_workers):
     prompt = f"""
@@ -37,6 +39,8 @@ def decidir_worker(pedido, estado_workers):
     }
 
     try:
+        if not URL_COMPLETA:
+            raise RuntimeError("IA_URL no configurada")
         response = requests.post(URL_COMPLETA, headers=headers, json=payload, timeout=12)
         response.raise_for_status()
         

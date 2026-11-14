@@ -16,3 +16,6 @@ def generar_pedidos(queue, num_pedidos=5):
         print(f"[IPC - Productor] Pedido generado: {pedido['id_pedido']} ({pedido['distancia_km']} km)")
         queue.put(json.dumps(pedido))
         time.sleep(1)
+
+    # Señal de fin para que el procesador termine y el sistema pueda cerrar
+    queue.put("FIN")
